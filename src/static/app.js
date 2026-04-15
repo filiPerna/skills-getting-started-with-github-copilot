@@ -20,12 +20,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Genera la lista dei partecipanti con icona di cancellazione
+        const participantsList = details.participants.length
+          ? details.participants.map((participant) => `
+              <li class="participant-item" style="list-style:none; display:flex; align-items:center; gap:6px;">
+                <span>${participant}</span>
+                <button class="delete-participant-btn" data-activity="${name}" data-participant="${participant}" title="Rimuovi partecipante" style="background:none;border:none;cursor:pointer;padding:0;">
+                  <span aria-label="Elimina" style="color:#c62828;font-size:1.1em;">&#128465;</span>
+                </button>
+              </li>
+            `).join("")
+          : "<li style=\"list-style:none;\">No participants yet</li>";
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-section">
+            <p class="participants-title">Participants (${details.participants.length})</p>
+            <ul class="participants-list" style="padding-left:0; margin:0;">${participantsList}</ul>
+          </div>
         `;
+
 
         activitiesList.appendChild(activityCard);
 
@@ -34,6 +51,40 @@ document.addEventListener("DOMContentLoaded", () => {
         option.value = name;
         option.textContent = name;
         activitySelect.appendChild(option);
+      });
+
+      // Aggiungi event listener per i bottoni di cancellazione
+      activitiesList.querySelectorAll('.delete-participant-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const activity = btn.getAttribute('data-activity');
+          const participant = btn.getAttribute('data-participant');
+          try {
+            const response = await fetch(`/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(participant)}`, {
+              method: 'POST',
+            });
+            const result = await response.json();
+            if (response.ok) {
+              messageDiv.textContent = result.message || 'Partecipante rimosso con successo';
+              messageDiv.className = 'success';
+              fetchActivities();
+            } else {
+              messageDiv.textContent = result.detail || 'Errore nella rimozione del partecipante';
+              messageDiv.className = 'error';
+            }
+            messageDiv.classList.remove('hidden');
+            setTimeout(() => {
+              messageDiv.classList.add('hidden');
+            }, 5000);
+          } catch (error) {
+            messageDiv.textContent = 'Errore di rete nella rimozione del partecipante.';
+            messageDiv.className = 'error';
+            messageDiv.classList.remove('hidden');
+            setTimeout(() => {
+              messageDiv.classList.add('hidden');
+            }, 5000);
+            console.error('Errore nella rimozione del partecipante:', error);
+          }
+        });
       });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
@@ -62,6 +113,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        // Aggiorna la lista delle attività senza ricaricare la pagina
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
